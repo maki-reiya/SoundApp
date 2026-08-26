@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SIGNAL BOARD ― BGMセレクター</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0d0e14;
+    --panel:#161822;
+    --pad:#1c1f2c;
+    --pad-border:#2b2f42;
+    --text:#eef0f7;
+    --muted:#787c94;
+    --mono:'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(circle at 15% 0%, rgba(255,255,255,0.035), transparent 45%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 16px;
+  }
+  .board{
+    width:100%;
+    max-width:920px;
+    background:var(--panel);
+    border:1px solid var(--pad-border);
+    border-radius:20px;
+    padding:32px 28px 28px;
+    box-shadow:0 40px 80px -30px rgba(0,0,0,0.6);
+  }
+  .board-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    margin-bottom:26px;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.18em;
+    color:var(--muted);
+    text-transform:uppercase;
+    margin:0 0 6px;
+  }
+  h1{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:700;
+    font-size:26px;
+    margin:0;
+    letter-spacing:-0.01em;
+  }
+  .status{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--muted);
+    text-align:right;
+    line-height:1.6;
+  }
+  .status b{
+    color:var(--text);
+    font-weight:500;
+  }
+  .status .dot{
+    display:inline-block;
+    width:6px;height:6px;
+    border-radius:50%;
+    background:#3a3f55;
+    margin-right:6px;
+    transition:background .2s, box-shadow .2s;
+  }
+  .status.playing .dot{
+    background:#6ee7b7;
+    box-shadow:0 0 8px #6ee7b7;
+  }
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:16px;
+  }
+  .cell{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .pad{
+    position:relative;
+    aspect-ratio:1/1;
+    background:var(--pad);
+    border:1px solid var(--pad-border);
+    border-radius:14px;
+    cursor:pointer;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    overflow:hidden;
+    transition:transform .12s ease, border-color .2s ease, background .2s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .pad:hover{transform:translateY(-2px);}
+  .pad:active{transform:translateY(0px) scale(0.98);}
+  .pad:focus-visible{
+    outline:2px solid var(--accent, #6ee7b7);
+    outline-offset:2px;
+  }
+  .pad.active{
+    background:radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--accent) 22%, var(--pad)), var(--pad));
+    border-color:var(--accent);
+  }
+  .pad .glow{
+    position:absolute;
+    inset:-40% -40% auto -40%;
+    height:140%;
+    background:radial-gradient(circle, color-mix(in srgb, var(--accent) 40%, transparent), transparent 65%);
+    opacity:0;
+    transition:opacity .3s ease;
+    pointer-events:none;
+  }
+  .pad.active .glow{opacity:0.55;}
+  .icon{
+    width:26px;
+    height:26px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:1;
+  }
+  .icon svg{width:100%;height:100%;fill:var(--text);opacity:0.85;}
+  .pad.active .icon svg{fill:var(--accent);opacity:1;}
+  .bars{
+    display:flex;
+    align-items:flex-end;
+    gap:3px;
+    height:26px;
+    z-index:1;
+  }
+  .bars span{
+    width:4px;
+    background:var(--pad-border);
+    border-radius:2px;
+    height:4px;
+    transition:background .2s ease;
+  }
+  .pad.active .bars span{background:var(--accent);}
+  .index-tag{
+    position:absolute;
+    top:10px;
+    left:12px;
+    font-family:var(--mono);
+    font-size:10px;
+    color:var(--muted);
+    letter-spacing:0.08em;
+    z-index:1;
+  }
+  .pad.active .index-tag{color:color-mix(in srgb, var(--accent) 70%, var(--muted));}
+  .title-input{
+    width:100%;
+    background:transparent;
+    border:none;
+    border-bottom:1px solid var(--pad-border);
+    color:var(--text);
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:500;
+    font-size:13px;
+    text-align:center;
+    padding:4px 2px 6px;
+    outline:none;
+    transition:border-color .2s ease;
+  }
+  .title-input:focus{border-bottom-color:var(--accent, #6ee7b7);}
+  .title-input::placeholder{color:var(--muted);}
+  .footer-hint{
+    margin-top:24px;
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--muted);
+    text-align:center;
+    letter-spacing:0.02em;
+  }
+  @media (max-width:640px){
+    .grid{grid-template-columns:repeat(2, 1fr);}
+    .board{padding:24px 18px 22px;}
+    .board-header{flex-direction:column;align-items:flex-start;}
+    .status{text-align:left;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .pad, .bars span, .glow{transition:none !important;}
+  }
+</style>
+</head>
+<body>
+
+<div class="board">
+  <div class="board-header">
+    <div>
+      <p class="eyebrow">Scene Selector / 8 Pads</p>
+      <h1>SIGNAL BOARD</h1>
+    </div>
+    <div class="status" id="status">
+      <span class="dot"></span>NOW PLAYING: <b id="nowPlaying">—</b>
+    </div>
+  </div>
+
+  <div class="grid" id="grid"></div>
+
+  <p class="footer-hint">クリックで再生 / もう一度クリックで停止 ・ タイトルは自由に書き換えられます</p>
+</div>
+
+<script>
+(function(){
+  // ---- 音階（周波数）テーブル ----
+  const N = {
+    C2:65.41,D2:73.42,E2:82.41,F2:87.31,G2:98.00,A2:110.00,B2:123.47,
+    C3:130.81,D3:146.83,E3:164.81,F3:174.61,G3:196.00,A3:220.00,B3:246.94,
+    C4:261.63,D4:293.66,E4:329.63,F4:349.23,G4:392.00,A4:440.00,B4:493.88,
+    C5:523.25,D5:587.33,E5:659.25,F5:698.46,G5:783.99,A5:880.00,
+    Db4:277.18,Eb4:311.13,Gb4:369.99,Ab4:415.30,Bb4:466.16,
+    Db3:138.59,Eb3:155.56,Gb3:185.00,Ab3:207.65,Bb3:233.08
+  };
+
+  // ---- 8パッドの設定（波形・テンポ・パターン・色） ----
+  const PADS = [
+    { title:"朝",       accent:"#ffd166", wave:"triangle", stepDur:0.35, vol:0.16,
+      pattern:[N.C4,N.E4,N.G4,N.E4,N.A4,N.G4,N.E4,N.D4] },
+    { title:"街",       accent:"#6ee7b7", wave:"square",   stepDur:0.28, vol:0.10,
+      pattern:[N.C3,null,N.G3,null,N.A3,null,N.E3,null] },
+    { title:"戦闘",     accent:"#ff6b6b", wave:"sawtooth", stepDur:0.14, vol:0.13,
+      pattern:[N.E3,N.G3,N.E3,N.A3,N.E3,N.G3,N.B3,N.C4] },
+    { title:"雨",       accent:"#4ecdc4", wave:"sine",     stepDur:0.55, vol:0.15,
+      pattern:[N.E4,null,N.B4,null,N.A4,null,N.D5,null] },
+    { title:"夜",       accent:"#a78bfa", wave:"sine",     stepDur:0.6,  vol:0.14,
+      pattern:[N.A3,null,N.C4,null,N.Eb4,null,N.G3,null] },
+    { title:"平和",     accent:"#f472b6", wave:"triangle", stepDur:0.42, vol:0.15,
+      pattern:[N.F4,N.A4,N.C5,N.A4,N.G4,N.Bb4,N.D5,N.C5] },
+    { title:"緊迫",     accent:"#38bdf8", wave:"sawtooth", stepDur:0.11, vol:0.11,
+      pattern:[N.Db4,N.C4,N.Gb3,N.G3,N.Db4,N.C4,N.Ab3,N.G3] },
+    { title:"エンディング", accent:"#fb923c", wave:"sine", stepDur:0.4, vol:0.16,
+      pattern:[N.C5,N.B4,N.A4,N.G4,N.F4,N.E4,N.D4,N.C4] },
+  ];
+
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let ctx = null;
+  let activePad = null;
+
+  function ensureCtx(){
+    if(!ctx) ctx = new AudioCtx();
+    if(ctx.state === "suspended") ctx.resume();
+    return ctx;
+  }
+
+  class BgmPad{
+    constructor(config, el){
+      this.config = config;
+      this.el = el;
+      this.isPlaying = false;
+      this.stepIndex = 0;
+      this.timer = null;
+      this.rafId = null;
+    }
+    setupNodes(){
+      const c = ensureCtx();
+      this.masterGain = c.createGain();
+      this.masterGain.gain.value = 0;
+      this.analyser = c.createAnalyser();
+      this.analyser.fftSize = 32;
+      this.dataArr = new Uint8Array(this.analyser.frequencyBinCount);
+      this.masterGain.connect(this.analyser);
+      this.analyser.connect(c.destination);
+    }
+    playNote(freq, time, dur){
+      if(freq === null) return;
+      const c = ctx;
+      const osc = c.createOscillator();
+      osc.type = this.config.wave;
+      osc.frequency.setValueAtTime(freq, time);
+      const g = c.createGain();
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.exponentialRampToValueAtTime(this.config.vol, time + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+      osc.connect(g);
+      g.connect(this.masterGain);
+      osc.start(time);
+      osc.stop(time + dur + 0.05);
+    }
+    scheduleStep(){
+      const t = ctx.currentTime;
+      const note = this.config.pattern[this.stepIndex % this.config.pattern.length];
+      this.playNote(note, t, this.config.stepDur * 0.92);
+      this.stepIndex++;
+    }
+    start(){
+      if(!this.masterGain) this.setupNodes();
+      this.isPlaying = true;
+      this.masterGain.gain.cancelScheduledValues(ctx.currentTime);
+      this.masterGain.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
+      this.scheduleStep();
+      this.timer = setInterval(() => this.scheduleStep(), this.config.stepDur * 1000);
+      this.animate();
+    }
+    stop(){
+      this.isPlaying = false;
+      if(this.masterGain){
+        this.masterGain.gain.cancelScheduledValues(ctx.currentTime);
+        this.masterGain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+      }
+      clearInterval(this.timer);
+      cancelAnimationFrame(this.rafId);
+      this.el.querySelectorAll(".bars span").forEach(b => b.style.height = "4px");
+    }
+    animate(){
+      if(!this.isPlaying) return;
+      this.analyser.getByteFrequencyData(this.dataArr);
+      const bars = this.el.querySelectorAll(".bars span");
+      const step = Math.floor(this.dataArr.length / bars.length);
+      bars.forEach((b, i) => {
+        const v = this.dataArr[i * step] || 0;
+        b.style.height = Math.max(4, (v / 255) * 26) + "px";
+      });
+      this.rafId = requestAnimationFrame(() => this.animate());
+    }
+  }
+
+  // ---- DOM構築 ----
+  const grid = document.getElementById("grid");
+  const nowPlayingEl = document.getElementById("nowPlaying");
+  const statusEl = document.getElementById("status");
+  const instances = [];
+
+  PADS.forEach((cfg, i) => {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+
+    const pad = document.createElement("button");
+    pad.className = "pad";
+    pad.style.setProperty("--accent", cfg.accent);
+    pad.setAttribute("aria-pressed", "false");
+    pad.innerHTML = `
+      <span class="glow"></span>
+      <span class="index-tag">${String(i+1).padStart(2,"0")}</span>
+      <span class="icon">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+      </span>
+      <span class="bars">${"<span></span>".repeat(8)}</span>
+    `;
+
+    const input = document.createElement("input");
+    input.className = "title-input";
+    input.type = "text";
+    input.value = cfg.title;
+    input.maxLength = 20;
+    input.placeholder = "タイトルを入力";
+    input.addEventListener("click", e => e.stopPropagation());
+
+    cell.appendChild(pad);
+    cell.appendChild(input);
+    grid.appendChild(cell);
+
+    const instance = new BgmPad(cfg, pad);
+    instances.push(instance);
+
+    pad.addEventListener("click", () => {
+      ensureCtx();
+      if(activePad === instance){
+        instance.stop();
+        pad.classList.remove("active");
+        pad.setAttribute("aria-pressed", "false");
+        setIconPlay(pad);
+        activePad = null;
+        nowPlayingEl.textContent = "—";
+        statusEl.classList.remove("playing");
+        return;
+      }
+      if(activePad){
+        activePad.stop();
+        activePad.el.classList.remove("active");
+        activePad.el.setAttribute("aria-pressed", "false");
+        setIconPlay(activePad.el);
+      }
+      instance.start();
+      pad.classList.add("active");
+      pad.setAttribute("aria-pressed", "true");
+      setIconPause(pad);
+      activePad = instance;
+      nowPlayingEl.textContent = input.value || cfg.title;
+      statusEl.classList.add("playing");
+    });
+
+    input.addEventListener("input", () => {
+      if(activePad === instance){
+        nowPlayingEl.textContent = input.value || cfg.title;
+      }
+    });
+  });
+
+  function setIconPause(pad){
+    pad.querySelector(".icon svg").innerHTML = '<path d="M6 5h4v14H6zM14 5h4v14h-4z"/>';
+  }
+  function setIconPlay(pad){
+    pad.querySelector(".icon svg").innerHTML = '<path d="M8 5v14l11-7z"/>';
+  }
+})();
+</script>
+
+</body>
+</html>
