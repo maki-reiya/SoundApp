@@ -192,6 +192,45 @@
     text-align:center;
     letter-spacing:0.02em;
   }
+  .file-row{
+    min-height:26px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  .file-status{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    max-width:100%;
+    font-family:var(--mono);
+    font-size:10px;
+    color:var(--muted);
+    background:rgba(255,255,255,0.03);
+    border:1px solid var(--pad-border);
+    border-radius:20px;
+    padding:4px 10px;
+  }
+  .file-status .file-path{
+    max-width:130px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+  .file-status .file-dot{
+    width:6px;height:6px;
+    border-radius:50%;
+    background:#3a3f55;
+    flex:none;
+    transition:background .2s ease;
+  }
+  .file-status[data-state="checking"] .file-dot{background:#5a5f78;}
+  .file-status[data-state="ok"] .file-dot{background:#6ee7b7;box-shadow:0 0 6px #6ee7b7;}
+  .file-status[data-state="ok"] .file-path{color:var(--text);}
+  .file-status[data-state="missing"] .file-dot{background:#787c94;}
+  .file-status[data-state="missing"] .file-path{color:var(--muted);}
   @media (max-width:640px){
     .grid{grid-template-columns:repeat(2, 1fr);}
     .board{padding:24px 18px 22px;}
@@ -218,7 +257,7 @@
 
   <div class="grid" id="grid"></div>
 
-  <p class="footer-hint">クリックで再生 / もう一度クリックで停止 ・ タイトルは自由に書き換えられます</p>
+  <p class="footer-hint">クリックで再生 / もう一度クリックで停止 ・ タイトルは自由に書き換えられます<br>index.htmlと同じ場所に「bgm」フォルダを作り、01.mp3〜08.mp3を入れると自動で読み込まれます(未配置のパッドはデモ音を再生)</p>
 </div>
 
 <script>
@@ -233,23 +272,25 @@
     Db3:138.59,Eb3:155.56,Gb3:185.00,Ab3:207.65,Bb3:233.08
   };
 
-  // ---- 8パッドの設定（波形・テンポ・パターン・色） ----
+  // ---- 8パッドの設定（波形・テンポ・パターン・色・内蔵mp3のパス） ----
+  // 「file」に指定したパスに mp3 を置いておくと、ページを開いた時に自動で読み込まれます。
+  // index.html と同じ階層に "bgm" フォルダを作り、そこに 01.mp3 〜 08.mp3 を入れてください。
   const PADS = [
-    { title:"朝",       accent:"#ffd166", wave:"triangle", stepDur:0.35, vol:0.16,
+    { title:"朝",       accent:"#ffd166", wave:"triangle", stepDur:0.35, vol:0.16, file:"bgm/01.mp3",
       pattern:[N.C4,N.E4,N.G4,N.E4,N.A4,N.G4,N.E4,N.D4] },
-    { title:"街",       accent:"#6ee7b7", wave:"square",   stepDur:0.28, vol:0.10,
+    { title:"街",       accent:"#6ee7b7", wave:"square",   stepDur:0.28, vol:0.10, file:"bgm/02.mp3",
       pattern:[N.C3,null,N.G3,null,N.A3,null,N.E3,null] },
-    { title:"戦闘",     accent:"#ff6b6b", wave:"sawtooth", stepDur:0.14, vol:0.13,
+    { title:"戦闘",     accent:"#ff6b6b", wave:"sawtooth", stepDur:0.14, vol:0.13, file:"bgm/03.mp3",
       pattern:[N.E3,N.G3,N.E3,N.A3,N.E3,N.G3,N.B3,N.C4] },
-    { title:"雨",       accent:"#4ecdc4", wave:"sine",     stepDur:0.55, vol:0.15,
+    { title:"雨",       accent:"#4ecdc4", wave:"sine",     stepDur:0.55, vol:0.15, file:"bgm/04.mp3",
       pattern:[N.E4,null,N.B4,null,N.A4,null,N.D5,null] },
-    { title:"夜",       accent:"#a78bfa", wave:"sine",     stepDur:0.6,  vol:0.14,
+    { title:"夜",       accent:"#a78bfa", wave:"sine",     stepDur:0.6,  vol:0.14, file:"bgm/05.mp3",
       pattern:[N.A3,null,N.C4,null,N.Eb4,null,N.G3,null] },
-    { title:"平和",     accent:"#f472b6", wave:"triangle", stepDur:0.42, vol:0.15,
+    { title:"平和",     accent:"#f472b6", wave:"triangle", stepDur:0.42, vol:0.15, file:"bgm/06.mp3",
       pattern:[N.F4,N.A4,N.C5,N.A4,N.G4,N.Bb4,N.D5,N.C5] },
-    { title:"緊迫",     accent:"#38bdf8", wave:"sawtooth", stepDur:0.11, vol:0.11,
+    { title:"緊迫",     accent:"#38bdf8", wave:"sawtooth", stepDur:0.11, vol:0.11, file:"bgm/07.mp3",
       pattern:[N.Db4,N.C4,N.Gb3,N.G3,N.Db4,N.C4,N.Ab3,N.G3] },
-    { title:"エンディング", accent:"#fb923c", wave:"sine", stepDur:0.4, vol:0.16,
+    { title:"エンディング", accent:"#fb923c", wave:"sine", stepDur:0.4, vol:0.16, file:"bgm/08.mp3",
       pattern:[N.C5,N.B4,N.A4,N.G4,N.F4,N.E4,N.D4,N.C4] },
   ];
 
@@ -267,10 +308,14 @@
     constructor(config, el){
       this.config = config;
       this.el = el;
+      this.mode = "synth"; // "synth" | "file"
       this.isPlaying = false;
       this.stepIndex = 0;
       this.timer = null;
       this.rafId = null;
+      this.audioEl = null;
+      this.sourceNode = null;
+      this.fileName = null;
     }
     setupNodes(){
       const c = ensureCtx();
@@ -281,6 +326,35 @@
       this.dataArr = new Uint8Array(this.analyser.frequencyBinCount);
       this.masterGain.connect(this.analyser);
       this.analyser.connect(c.destination);
+    }
+    attachAudioElement(audioEl, fileName){
+      const c = ensureCtx();
+      if(!this.masterGain) this.setupNodes();
+      if(this.sourceNode){ this.sourceNode.disconnect(); }
+      audioEl.loop = true;
+      this.audioEl = audioEl;
+      this.sourceNode = c.createMediaElementSource(this.audioEl);
+      this.sourceNode.connect(this.masterGain);
+      this.mode = "file";
+      this.fileName = fileName;
+    }
+    tryAutoLoad(path, onResult){
+      const audioEl = new Audio();
+      let settled = false;
+      audioEl.addEventListener("canplaythrough", () => {
+        if(settled) return;
+        settled = true;
+        this.attachAudioElement(audioEl, path);
+        onResult(true);
+      }, { once:true });
+      audioEl.addEventListener("error", () => {
+        if(settled) return;
+        settled = true;
+        onResult(false);
+      }, { once:true });
+      audioEl.preload = "auto";
+      audioEl.src = path;
+      audioEl.load();
     }
     playNote(freq, time, dur){
       if(freq === null) return;
@@ -308,8 +382,14 @@
       this.isPlaying = true;
       this.masterGain.gain.cancelScheduledValues(ctx.currentTime);
       this.masterGain.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
-      this.scheduleStep();
-      this.timer = setInterval(() => this.scheduleStep(), this.config.stepDur * 1000);
+
+      if(this.mode === "file" && this.audioEl){
+        this.audioEl.currentTime = 0;
+        this.audioEl.play();
+      } else {
+        this.scheduleStep();
+        this.timer = setInterval(() => this.scheduleStep(), this.config.stepDur * 1000);
+      }
       this.animate();
     }
     stop(){
@@ -317,6 +397,9 @@
       if(this.masterGain){
         this.masterGain.gain.cancelScheduledValues(ctx.currentTime);
         this.masterGain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+      }
+      if(this.mode === "file" && this.audioEl){
+        this.audioEl.pause();
       }
       clearInterval(this.timer);
       cancelAnimationFrame(this.rafId);
@@ -366,12 +449,37 @@
     input.placeholder = "タイトルを入力";
     input.addEventListener("click", e => e.stopPropagation());
 
+    const fileRow = document.createElement("div");
+    fileRow.className = "file-row";
+    fileRow.innerHTML = `
+      <div class="file-status" data-state="checking">
+        <span class="file-dot"></span>
+        <span class="file-path">${cfg.file}</span>
+      </div>
+    `;
+
     cell.appendChild(pad);
     cell.appendChild(input);
+    cell.appendChild(fileRow);
     grid.appendChild(cell);
 
     const instance = new BgmPad(cfg, pad);
     instances.push(instance);
+
+    const fileStatus = fileRow.querySelector(".file-status");
+    const filePathSpan = fileRow.querySelector(".file-path");
+
+    function refreshNowPlayingLabel(){
+      if(activePad === instance){
+        nowPlayingEl.textContent = (input.value || cfg.title) + (instance.mode === "file" ? " ・ " + instance.fileName : " ・ デモ音");
+      }
+    }
+
+    // index.html 側であらかじめ指定した bgm/xx.mp3 を読み込む。無ければデモ音のまま。
+    instance.tryAutoLoad(cfg.file, (found) => {
+      fileStatus.dataset.state = found ? "ok" : "missing";
+      filePathSpan.textContent = found ? cfg.file : cfg.file + "(未配置・デモ音再生中)";
+    });
 
     pad.addEventListener("click", () => {
       ensureCtx();
@@ -396,15 +504,11 @@
       pad.setAttribute("aria-pressed", "true");
       setIconPause(pad);
       activePad = instance;
-      nowPlayingEl.textContent = input.value || cfg.title;
+      refreshNowPlayingLabel();
       statusEl.classList.add("playing");
     });
 
-    input.addEventListener("input", () => {
-      if(activePad === instance){
-        nowPlayingEl.textContent = input.value || cfg.title;
-      }
-    });
+    input.addEventListener("input", refreshNowPlayingLabel);
   });
 
   function setIconPause(pad){
