@@ -192,6 +192,58 @@
     text-align:center;
     letter-spacing:0.02em;
   }
+  .loop-row{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .loop-switch{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    background:transparent;
+    border:none;
+    cursor:pointer;
+    padding:0;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .loop-label{
+    font-family:var(--mono);
+    font-size:10px;
+    letter-spacing:0.08em;
+    color:var(--muted);
+    transition:color .15s ease;
+  }
+  .switch-track{
+    position:relative;
+    width:32px;
+    height:18px;
+    border-radius:999px;
+    background:var(--pad-border);
+    border:1px solid var(--pad-border);
+    transition:background .2s ease, border-color .2s ease;
+    flex:none;
+  }
+  .switch-knob{
+    position:absolute;
+    top:2px;
+    left:2px;
+    width:12px;
+    height:12px;
+    border-radius:50%;
+    background:var(--muted);
+    transition:transform .2s ease, background .2s ease;
+  }
+  .loop-switch[aria-checked="true"] .switch-track{
+    background:color-mix(in srgb, #6ee7b7 25%, var(--pad-border));
+    border-color:#6ee7b7;
+  }
+  .loop-switch[aria-checked="true"] .switch-knob{
+    transform:translateX(14px);
+    background:#6ee7b7;
+    box-shadow:0 0 6px #6ee7b7;
+  }
+  .loop-switch[aria-checked="true"] .loop-label{color:var(--text);}
   .file-row{
     min-height:26px;
     display:flex;
@@ -257,7 +309,7 @@
 
   <div class="grid" id="grid"></div>
 
-  <p class="footer-hint">クリックで再生 / もう一度クリックで停止 ・ タイトルは自由に書き換えられます<br>index.htmlと同じ場所に「bgm」フォルダを作り、01.mp3〜08.mp3を入れると自動で読み込まれます(未配置のパッドはデモ音を再生)</p>
+  <p class="footer-hint">クリックで再生 / もう一度クリックで停止 ・ タイトルは自由に書き換えられます<br>各パッドの LOOP スイッチ:ONでループ再生、OFFで1回のみ再生して自動停止します<br>index.htmlと同じ場所に「bgm」フォルダを作り、mp3を入れると自動で読み込まれます(未配置のパッドはデモ音を再生)</p>
 </div>
 
 <script>
@@ -300,8 +352,14 @@
 
   function ensureCtx(){
     if(!ctx) ctx = new AudioCtx();
-    if(ctx.state === "suspended") ctx.resume();
     return ctx;
+  }
+  function ensureRunning(){
+    const c = ensureCtx();
+    if(c.state === "suspended"){
+      return c.resume().catch(err => console.warn("AudioContext resume failed:", err));
+    }
+    return Promise.resolve();
   }
 
   class BgmPad{
@@ -328,15 +386,14 @@
       this.analyser.connect(c.destination);
     }
     attachAudioElement(audioEl, fileName){
-      const c = ensureCtx();
-      if(!this.masterGain) this.setupNodes();
-      if(this.sourceNode){ this.sourceNode.disconnect(); }
-      audioEl.loop = true;
+      // mp3はWeb Audio API(解析ノード)を経由せず直接再生する。
+      // file:// で開いた場合にWeb Audio経由だと無音になることがあるための回避策。
       this.audioEl = audioEl;
-      this.sourceNode = c.createMediaElementSource(this.audioEl);
-      this.sourceNode.connect(this.masterGain);
       this.mode = "file";
       this.fileName = fileName;
+      this.audioEl.addEventListener("ended", () => {
+        if(this.isPlaying && !this.loopOn) this.finishNaturally();
+      });
     }
     tryAutoLoad(path, onResult){
       const audioEl = new Audio();
@@ -345,7 +402,7 @@
         if(settled) return;
         settled = true;
         this.attachAudioElement(audioEl, path);
-        onResult(true);
+        onResult(this.mode === "file");
       }, { once:true });
       audioEl.addEventListener("error", () => {
         if(settled) return;
@@ -377,29 +434,60 @@
       this.playNote(note, t, this.config.stepDur * 0.92);
       this.stepIndex++;
     }
-    start(){
-      if(!this.masterGain) this.setupNodes();
+    async start(loopOn){
+      this.loopOn = loopOn;
       this.isPlaying = true;
-      this.masterGain.gain.cancelScheduledValues(ctx.currentTime);
-      this.masterGain.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
 
       if(this.mode === "file" && this.audioEl){
+        this.audioEl.loop = loopOn;
         this.audioEl.currentTime = 0;
-        this.audioEl.play();
+        this.audioEl.volume = 1;
+        const playPromise = this.audioEl.play();
+        if(playPromise && typeof playPromise.catch === "function"){
+          playPromise.catch(err => {
+            console.warn("mp3の再生に失敗しました。デモ音で代替します:", this.fileName, err);
+            this.mode = "synth";
+            this.startSynth(loopOn);
+          });
+        }
       } else {
-        this.scheduleStep();
-        this.timer = setInterval(() => this.scheduleStep(), this.config.stepDur * 1000);
+        await ensureRunning();
+        this.startSynth(loopOn);
       }
       this.animate();
     }
+    startSynth(loopOn){
+      if(!this.masterGain) this.setupNodes();
+      this.masterGain.gain.cancelScheduledValues(ctx.currentTime);
+      this.masterGain.gain.setTargetAtTime(1, ctx.currentTime, 0.05);
+      this.stepIndex = 0;
+      this.scheduleStep();
+      if(loopOn){
+        this.timer = setInterval(() => this.scheduleStep(), this.config.stepDur * 1000);
+      } else {
+        const totalSteps = this.config.pattern.length;
+        this.timer = setInterval(() => {
+          this.scheduleStep();
+          if(this.stepIndex >= totalSteps){
+            clearInterval(this.timer);
+            setTimeout(() => this.finishNaturally(), this.config.stepDur * 1000);
+          }
+        }, this.config.stepDur * 1000);
+      }
+    }
+    // ループOFF時、音が最後まで再生し終えたら自動で停止しUIを戻すためのフック。
+    // pad生成時に onEnded を差し込んでUIリセットと連動させる。
+    finishNaturally(){
+      this.stop();
+      if(typeof this.onEnded === "function") this.onEnded();
+    }
     stop(){
       this.isPlaying = false;
-      if(this.masterGain){
-        this.masterGain.gain.cancelScheduledValues(ctx.currentTime);
-        this.masterGain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
-      }
       if(this.mode === "file" && this.audioEl){
         this.audioEl.pause();
+      } else if(this.masterGain){
+        this.masterGain.gain.cancelScheduledValues(ctx.currentTime);
+        this.masterGain.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
       }
       clearInterval(this.timer);
       cancelAnimationFrame(this.rafId);
@@ -407,14 +495,36 @@
     }
     animate(){
       if(!this.isPlaying) return;
-      this.analyser.getByteFrequencyData(this.dataArr);
-      const bars = this.el.querySelectorAll(".bars span");
-      const step = Math.floor(this.dataArr.length / bars.length);
-      bars.forEach((b, i) => {
-        const v = this.dataArr[i * step] || 0;
-        b.style.height = Math.max(4, (v / 255) * 26) + "px";
-      });
+      if(this.mode === "file"){
+        // mp3は解析ノードを使わないため、簡易的な疑似アニメーションでバーを揺らす
+        this._phase = (this._phase || 0) + 0.18;
+        const bars = this.el.querySelectorAll(".bars span");
+        bars.forEach((b, i) => {
+          const v = (Math.sin(this._phase + i * 0.85) + 1) / 2;
+          b.style.height = (4 + v * 22) + "px";
+        });
+      } else {
+        this.analyser.getByteFrequencyData(this.dataArr);
+        const bars = this.el.querySelectorAll(".bars span");
+        const step = Math.floor(this.dataArr.length / bars.length);
+        bars.forEach((b, i) => {
+          const v = this.dataArr[i * step] || 0;
+          b.style.height = Math.max(4, (v / 255) * 26) + "px";
+        });
+      }
       this.rafId = requestAnimationFrame(() => this.animate());
+    }
+  }
+
+  // パッド停止時のUIリセット（手動停止・自然終了の両方から呼ばれる）
+  function resetPadUI(instance, pad){
+    pad.classList.remove("active");
+    pad.setAttribute("aria-pressed", "false");
+    setIconPlay(pad);
+    if(activePad === instance){
+      activePad = null;
+      nowPlayingEl.textContent = "—";
+      statusEl.classList.remove("playing");
     }
   }
 
@@ -449,6 +559,15 @@
     input.placeholder = "タイトルを入力";
     input.addEventListener("click", e => e.stopPropagation());
 
+    const loopRow = document.createElement("div");
+    loopRow.className = "loop-row";
+    loopRow.innerHTML = `
+      <button type="button" class="loop-switch" role="switch" aria-checked="true">
+        <span class="loop-label">LOOP</span>
+        <span class="switch-track"><span class="switch-knob"></span></span>
+      </button>
+    `;
+
     const fileRow = document.createElement("div");
     fileRow.className = "file-row";
     fileRow.innerHTML = `
@@ -460,11 +579,20 @@
 
     cell.appendChild(pad);
     cell.appendChild(input);
+    cell.appendChild(loopRow);
     cell.appendChild(fileRow);
     grid.appendChild(cell);
 
     const instance = new BgmPad(cfg, pad);
+    instance.loopOn = true;
     instances.push(instance);
+
+    const loopSwitchEl = loopRow.querySelector(".loop-switch");
+    loopSwitchEl.addEventListener("click", () => {
+      instance.loopOn = !instance.loopOn;
+      loopSwitchEl.setAttribute("aria-checked", String(instance.loopOn));
+      if(instance.audioEl) instance.audioEl.loop = instance.loopOn;
+    });
 
     const fileStatus = fileRow.querySelector(".file-status");
     const filePathSpan = fileRow.querySelector(".file-path");
@@ -481,25 +609,23 @@
       filePathSpan.textContent = found ? cfg.file : cfg.file + "(未配置・デモ音再生中)";
     });
 
+    // ループOFFで再生が最後まで終わった時、自動でUIを元に戻す
+    instance.onEnded = () => resetPadUI(instance, pad);
+
     pad.addEventListener("click", () => {
       ensureCtx();
       if(activePad === instance){
         instance.stop();
-        pad.classList.remove("active");
-        pad.setAttribute("aria-pressed", "false");
-        setIconPlay(pad);
-        activePad = null;
-        nowPlayingEl.textContent = "—";
-        statusEl.classList.remove("playing");
+        resetPadUI(instance, pad);
         return;
       }
       if(activePad){
-        activePad.stop();
-        activePad.el.classList.remove("active");
-        activePad.el.setAttribute("aria-pressed", "false");
-        setIconPlay(activePad.el);
+        const prevInstance = activePad;
+        const prevPad = activePad.el;
+        prevInstance.stop();
+        resetPadUI(prevInstance, prevPad);
       }
-      instance.start();
+      instance.start(instance.loopOn);
       pad.classList.add("active");
       pad.setAttribute("aria-pressed", "true");
       setIconPause(pad);
