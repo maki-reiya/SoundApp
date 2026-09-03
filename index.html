@@ -324,25 +324,26 @@
     Db3:138.59,Eb3:155.56,Gb3:185.00,Ab3:207.65,Bb3:233.08
   };
 
-  // ---- 8パッドの設定（波形・テンポ・パターン・色・内蔵mp3のパス） ----
+  // ---- 8パッドの設定（波形・テンポ・パターン・色・内蔵mp3のパス・ループ初期値） ----
   // 「file」に指定したパスに mp3 を置いておくと、ページを開いた時に自動で読み込まれます。
-  // index.html と同じ階層に "bgm" フォルダを作り、そこに 01.mp3 〜 08.mp3 を入れてください。
+  // index.html と同じ階層に "bgm" フォルダを作り、そこに mp3 を入れてください。
+  // 「loop」で初期状態のループON/OFFを指定できます（省略時はON扱い）。
   const PADS = [
-    { title:"ドラムロール",       accent:"#ffd166", wave:"triangle", stepDur:0.35, vol:0.16, file:"bgm/ドラムロール.mp3",
+    { title:"開始前BGM",       accent:"#ffd166", wave:"triangle", stepDur:0.35, vol:0.16, file:"bgm/野良猫は宇宙を目指した_2.mp3", loop:true,
       pattern:[N.C4,N.E4,N.G4,N.E4,N.A4,N.G4,N.E4,N.D4] },
-    { title:"ジャーン",       accent:"#6ee7b7", wave:"square",   stepDur:0.28, vol:0.10, file:"bgm/ロールの閉め.mp3",
+    { title:"休憩時間",       accent:"#6ee7b7", wave:"square",   stepDur:0.28, vol:0.10, file:"bgm/昼下がり気分.mp3", loop:true,
       pattern:[N.C3,null,N.G3,null,N.A3,null,N.E3,null] },
-    { title:"戦闘",     accent:"#ff6b6b", wave:"sawtooth", stepDur:0.14, vol:0.13, file:"bgm/03.mp3",
+    { title:"アスノチャレンジ企画発表",     accent:"#ff6b6b", wave:"sawtooth", stepDur:0.14, vol:0.13, file:"bgm/パステルハウス.mp3", loop:true,
       pattern:[N.E3,N.G3,N.E3,N.A3,N.E3,N.G3,N.B3,N.C4] },
-    { title:"雨",       accent:"#4ecdc4", wave:"sine",     stepDur:0.55, vol:0.15, file:"bgm/04.mp3",
+    { title:"表彰式スタート",       accent:"#4ecdc4", wave:"sine",     stepDur:0.55, vol:0.15, file:"bgm/予算不足のファンファーレ.mp3", loop:true,
       pattern:[N.E4,null,N.B4,null,N.A4,null,N.D5,null] },
-    { title:"夜",       accent:"#a78bfa", wave:"sine",     stepDur:0.6,  vol:0.14, file:"bgm/05.mp3",
+    { title:"表彰中",       accent:"#a78bfa", wave:"sine",     stepDur:0.6,  vol:0.14, file:"bgm/commendation.mp3", loop:true,
       pattern:[N.A3,null,N.C4,null,N.Eb4,null,N.G3,null] },
-    { title:"平和",     accent:"#f472b6", wave:"triangle", stepDur:0.42, vol:0.15, file:"bgm/06.mp3",
+    { title:"写真撮影→懇親会へ移動",     accent:"#f472b6", wave:"triangle", stepDur:0.42, vol:0.15, file:"bgm/しゅわしゅわハニーレモン350ml.mp3", loop:true,
       pattern:[N.F4,N.A4,N.C5,N.A4,N.G4,N.Bb4,N.D5,N.C5] },
-    { title:"緊迫",     accent:"#38bdf8", wave:"sawtooth", stepDur:0.11, vol:0.11, file:"bgm/07.mp3",
+    { title:"ドラムロール",     accent:"#38bdf8", wave:"sawtooth", stepDur:0.11, vol:0.11, file:"bgm/ドラムロール.mp3", loop:false,
       pattern:[N.Db4,N.C4,N.Gb3,N.G3,N.Db4,N.C4,N.Ab3,N.G3] },
-    { title:"エンディング", accent:"#fb923c", wave:"sine", stepDur:0.4, vol:0.16, file:"bgm/08.mp3",
+    { title:"ジャーン", accent:"#fb923c", wave:"sine", stepDur:0.4, vol:0.16, file:"bgm/ロールの閉め.mp3", loop:false,
       pattern:[N.C5,N.B4,N.A4,N.G4,N.F4,N.E4,N.D4,N.C4] },
   ];
 
@@ -559,10 +560,12 @@
     input.placeholder = "タイトルを入力";
     input.addEventListener("click", e => e.stopPropagation());
 
+    const initialLoop = cfg.loop !== false;
+
     const loopRow = document.createElement("div");
     loopRow.className = "loop-row";
     loopRow.innerHTML = `
-      <button type="button" class="loop-switch" role="switch" aria-checked="true">
+      <button type="button" class="loop-switch" role="switch" aria-checked="${initialLoop}">
         <span class="loop-label">LOOP</span>
         <span class="switch-track"><span class="switch-knob"></span></span>
       </button>
@@ -584,7 +587,7 @@
     grid.appendChild(cell);
 
     const instance = new BgmPad(cfg, pad);
-    instance.loopOn = true;
+    instance.loopOn = initialLoop;
     instances.push(instance);
 
     const loopSwitchEl = loopRow.querySelector(".loop-switch");
